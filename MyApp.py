@@ -1,58 +1,22 @@
 import streamlit as st
 import pandas as pd
+import joblib
 import bnlearn as bn
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
 
-# Caching dataset load
-@st.cache_data
-def load_data():
-    data = pd.read_csv("dataset_risque_cardiaque.csv")
-    replace_map = {
-        'Oui': 1, 'Non': 0,
-        'Homme': 1, 'Femme': 0,
-        'Jeune': 0, 'Moyen': 1, 'Adulte': 2
-    }
-    return data.replace(replace_map)
-
-# Caching model training
+# Load model from disk
 @st.cache_resource
-def train_model(data):
-    edges = [
-        ('Age', 'Risque_cardiaque'),
-        ('Sexe', 'Risque_cardiaque'),
-        ('Tabagisme', 'Risque_cardiaque'),
-        ('Hypertension', 'Risque_cardiaque'),
-        ('Cholesterol_eleve', 'Risque_cardiaque'),
-        ('Antecedents_familiaux', 'Risque_cardiaque'),
-        ('Activite_physique', 'Risque_cardiaque'),
-        ('Diabete', 'Risque_cardiaque'),
-        ('Stress_chronique', 'Risque_cardiaque')
-    ]
-    DAG = bn.make_DAG(edges)
-    train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
-    model = bn.parameter_learning.fit(DAG, train_data)
+def load_model():
+    return joblib.load("model_bayes.pkl")
 
-    # Accuracy
-    pred_df = bn.predict(
-        model,
-        test_data.drop(columns='Risque_cardiaque'),
-        variables=['Risque_cardiaque'],
-        verbose=False
-    )
-    acc = accuracy_score(test_data['Risque_cardiaque'].astype(int), pred_df['Risque_cardiaque'].astype(int))
-    return model, acc
+model = load_model()
 
-# Page config
-st.set_page_config(page_title="🫀 Risque Cardiaque", layout="centered")
-st.title("🫀 Prédiction du Risque Cardiaque avec un Réseau Bayésien")
+# Mapping
+map_vals = {'Oui': 1, 'Non': 0, 'Homme': 1, 'Femme': 0, 'Jeune': 0, 'Moyen': 1, 'Adulte': 2}
 
-# Load data and train model
-data = load_data()
-model, acc = train_model(data)
+# UI
+st.title("🫀 Prédiction du Risque Cardiaque")
 
-# Interface utilisateur
-with st.form("formulaire"):
+with st.form("input_form"):
     st.subheader("🧾 Informations du patient")
 
     age = st.selectbox("Tranche d'âge", ["Jeune", "Moyen", "Adulte"])
@@ -65,8 +29,7 @@ with st.form("formulaire"):
     diab = st.selectbox("Diabète ?", ["Oui", "Non"])
     stress = st.selectbox("Stress chronique ?", ["Oui", "Non"])
 
-    if st.form_submit_button("🧠 Prédire le Risque"):
-        map_vals = {'Oui': 1, 'Non': 0, 'Homme': 1, 'Femme': 0, 'Jeune': 0, 'Moyen': 1, 'Adulte': 2}
+    if st.form_submit_button("Prédire"):
         evidence = {
             'Age': map_vals[age],
             'Sexe': map_vals[sexe],
@@ -80,11 +43,6 @@ with st.form("formulaire"):
         }
 
         result = bn.inference.fit(model, variables=['Risque_cardiaque'], evidence=evidence)
-
         st.success("✅ Inférence réalisée avec succès")
-        st.write("### 📊 Probabilité de Risque Cardiaque")
+        st.write("### 📊 Résultat")
         st.dataframe(result.values.round(4))
-
-# Sidebar info
-st.sidebar.title("ℹ️ Modèle")
-st.sidebar.markdown(f"**Accuracy (ensemble de test)** : `{acc:.2%}`")
