@@ -4,7 +4,7 @@ import bnlearn as bn
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
-# Load and preprocess data
+# Caching dataset load
 @st.cache_data
 def load_data():
     data = pd.read_csv("dataset_risque_cardiaque.csv")
@@ -15,7 +15,7 @@ def load_data():
     }
     return data.replace(replace_map)
 
-# Build and train the Bayesian model
+# Caching model training
 @st.cache_resource
 def train_model(data):
     edges = [
@@ -33,54 +33,58 @@ def train_model(data):
     train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
     model = bn.parameter_learning.fit(DAG, train_data)
 
-    # Evaluate model
-    pred_df = bn.predict(model, test_data.drop(columns='Risque_cardiaque'), variables=['Risque_cardiaque'], verbose=False)
+    # Accuracy
+    pred_df = bn.predict(
+        model,
+        test_data.drop(columns='Risque_cardiaque'),
+        variables=['Risque_cardiaque'],
+        verbose=False
+    )
     acc = accuracy_score(test_data['Risque_cardiaque'].astype(int), pred_df['Risque_cardiaque'].astype(int))
     return model, acc
 
-# UI Setup
-st.set_page_config(page_title="Cardiac Risk Predictor", layout="centered")
-st.title("🫀 Cardiac Risk Prediction using Bayesian Network")
+# Page config
+st.set_page_config(page_title="🫀 Risque Cardiaque", layout="centered")
+st.title("🫀 Prédiction du Risque Cardiaque avec un Réseau Bayésien")
 
+# Load data and train model
 data = load_data()
 model, acc = train_model(data)
 
-# Form inputs
-with st.form("risk_form"):
-    st.subheader("Enter Patient Information:")
+# Interface utilisateur
+with st.form("formulaire"):
+    st.subheader("🧾 Informations du patient")
 
-    age = st.selectbox("Age Group", ["Jeune", "Moyen", "Adulte"])
+    age = st.selectbox("Tranche d'âge", ["Jeune", "Moyen", "Adulte"])
     sexe = st.selectbox("Sexe", ["Homme", "Femme"])
-    tabagisme = st.selectbox("Fumeur ?", ["Oui", "Non"])
-    hypertension = st.selectbox("Hypertension ?", ["Oui", "Non"])
-    cholesterol = st.selectbox("Cholestérol élevé ?", ["Oui", "Non"])
-    antecedents = st.selectbox("Antécédents familiaux ?", ["Oui", "Non"])
-    activite = st.selectbox("Activité physique régulière ?", ["Oui", "Non"])
-    diabete = st.selectbox("Diabète ?", ["Oui", "Non"])
+    tabac = st.selectbox("Fumeur ?", ["Oui", "Non"])
+    htn = st.selectbox("Hypertension ?", ["Oui", "Non"])
+    chol = st.selectbox("Cholestérol élevé ?", ["Oui", "Non"])
+    ant_fam = st.selectbox("Antécédents familiaux ?", ["Oui", "Non"])
+    sport = st.selectbox("Activité physique régulière ?", ["Oui", "Non"])
+    diab = st.selectbox("Diabète ?", ["Oui", "Non"])
     stress = st.selectbox("Stress chronique ?", ["Oui", "Non"])
 
-    submitted = st.form_submit_button("Prédire le risque")
-
-    if submitted:
+    if st.form_submit_button("🧠 Prédire le Risque"):
         map_vals = {'Oui': 1, 'Non': 0, 'Homme': 1, 'Femme': 0, 'Jeune': 0, 'Moyen': 1, 'Adulte': 2}
         evidence = {
             'Age': map_vals[age],
             'Sexe': map_vals[sexe],
-            'Tabagisme': map_vals[tabagisme],
-            'Hypertension': map_vals[hypertension],
-            'Cholesterol_eleve': map_vals[cholesterol],
-            'Antecedents_familiaux': map_vals[antecedents],
-            'Activite_physique': map_vals[activite],
-            'Diabete': map_vals[diabete],
-            'Stress_chronique': map_vals[stress],
+            'Tabagisme': map_vals[tabac],
+            'Hypertension': map_vals[htn],
+            'Cholesterol_eleve': map_vals[chol],
+            'Antecedents_familiaux': map_vals[ant_fam],
+            'Activite_physique': map_vals[sport],
+            'Diabete': map_vals[diab],
+            'Stress_chronique': map_vals[stress]
         }
 
         result = bn.inference.fit(model, variables=['Risque_cardiaque'], evidence=evidence)
-        st.success("Inférence terminée !")
 
-        st.write("### 📊 Résultat de l'inférence")
-        st.dataframe(result.values.round(4), use_container_width=True)
+        st.success("✅ Inférence réalisée avec succès")
+        st.write("### 📊 Probabilité de Risque Cardiaque")
+        st.dataframe(result.values.round(4))
 
-# Accuracy display
+# Sidebar info
 st.sidebar.title("ℹ️ Modèle")
-st.sidebar.write(f"**Accuracy sur les données de test** : {acc:.2%}")
+st.sidebar.markdown(f"**Accuracy (ensemble de test)** : `{acc:.2%}`")
